@@ -86,11 +86,17 @@ def preprocess_image(img_pil, size, preprocess_fn):
 
 
 # --- 4. THE UPLOAD WIDGET ---
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader(
+    "Choose an image...",
+    type=["jpg", "jpeg", "png", "webp", "bmp", "tif", "tiff", "gif", "ico"],
+)
 
 if uploaded_file is not None:
     # 1. Display the uploaded image
     image = Image.open(uploaded_file)
+    # For animated images (GIF/TIFF), use the first frame
+    if getattr(image, "is_animated", False):
+        image.seek(0)
     st.image(image, caption="You uploaded this image:", use_container_width=True)
     st.write("")
 
