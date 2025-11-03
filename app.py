@@ -1,53 +1,50 @@
-from ast import FunctionType
-from typing import Any, TypedDict
+from typing import Any, Callable, TypedDict
 import streamlit as st
-import keras  # type: ignore[import] # pylint: disable=E0611,W0611
+import keras  # type: ignore[import]  # New Keras: import directly; no TensorFlow import needed
 from PIL import Image
 import numpy as np
 import json
+import os
 
 # --- 1. SET UP THE PAGE ---
 st.set_page_config(page_title="Fruit Classifier", layout="centered")
 st.title("Fruit Vegetable Classifier")
 st.write("Upload an image of a fruit or vegetable, and we shall find out what it is")
 
+
 class ModelConfig(TypedDict):
     file: str
     size: tuple[int, int]
+    # name for selecting correct preprocessing
+    family: str
+
 
 # --- 2. LOAD THE MODEL AND LABELS ---
 
-# Import the specific preprocessing functions
-from keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
-from keras.applications.efficientnet_v2 import preprocess_input as efficientnet_v2_preprocess
-
-# Define ModelConfig ONCE
-class ModelConfig(TypedDict):
-    file: str
-    size: tuple[int, int]
-    prep_func: FunctionType
-
-# Add the prep_func to your config
 MODEL_CONFIG: dict[str, ModelConfig] = {
     "MobileNetV2": {
         "file": "mobilenet_model.keras",
         "size": (224, 224),
-        "prep_func": mobilenet_preprocess,
+        "family": "mobilenet_v2",
     },
     "EfficientNetV2B0": {
         "file": "efficientnet_model.keras",
         "size": (224, 224),
-        "prep_func": efficientnet_v2_preprocess,
+        "family": "efficientnet_v2",
     },
 }
 
-# nitialize default model in session state
+# Choose which model to use
+# Initialize default model in session state
 if "model_choice" not in st.session_state:
     st.session_state["model_choice"] = "MobileNetV2"
 
-# Create the selectbox widget
 _options = list(MODEL_CONFIG.keys())
-_default_index = _options.index(st.session_state["model_choice"])
+_default_index = (
+    _options.index(st.session_state["model_choice"])
+    if st.session_state["model_choice"] in _options
+    else 0
+)
 
 st.selectbox(
     "Choose a model",
@@ -59,25 +56,66 @@ st.selectbox(
 selected_model_name = st.session_state["model_choice"]
 selected_model_cfg = MODEL_CONFIG[selected_model_name]
 
+# --- Early validation: fail fast on misconfiguration ---
+_supported_families = {"mobilenet_v2", "efficientnet_v2"}
+if selected_model_cfg["family"] not in _supported_families:
+    st.error(
+        f"Unsupported model family '{selected_model_cfg['family']}'. Supported: {sorted(_supported_families)}."
+    )
+    st.stop()
+
+model_path = selected_model_cfg["file"]
+if not os.path.exists(model_path):
+    st.error(f"Model file not found: {model_path}")
+    st.stop()
+
+if not os.path.exists("labels.json"):
+    st.error("Required file 'labels.json' not found in app directory.")
+    st.stop()
+
+
 @st.cache_resource
-def load_my_model(model_path: str) -> Any:
-    loaded_model = keras.models.load_model(model_path)
+def load_my_model(model_path_in: str) -> Any:
+    loaded_model = keras.models.load_model(model_path_in)
     assert loaded_model is not None
     return loaded_model
+
 
 @st.cache_data
 def load_my_labels():
     with open("labels.json", "r", encoding="utf-8") as f:
+        # Load the dictionary and convert string keys back to integers
         labels_from_json = json.load(f)
         label_map = {int(k): v for k, v in labels_from_json.items()}
     return label_map
 
 
-model = load_my_model(model_path=selected_model_cfg["file"])
+model = load_my_model(model_path_in=model_path)
 labels = load_my_labels()
 
+
 # --- 3. PREPROCESSING FUNCTION ---
-def preprocess_image(img_pil: Image.Image, size: tuple[int, int], prep_func: FunctionType):
+def get_preprocess_fn(family: str) -> Callable[[Any], Any]:
+    """Return the appropriate preprocess_input function for a given model family.
+
+    Supported families: 'mobilenet_v2', 'efficientnet_v2'.
+    Raises:
+        ValueError: if the provided family is not supported.
+    """
+    if family == "mobilenet_v2":
+        return keras.applications.mobilenet_v2.preprocess_input
+    if family == "efficientnet_v2":
+        return keras.applications.efficientnet_v2.preprocess_input
+    raise ValueError(
+        f"Unsupported model family '{family}'. Supported: 'mobilenet_v2', 'efficientnet_v2'."
+    )
+
+
+def preprocess_image(
+    img_pil: Image.Image,
+    size: tuple[int, int],
+    preprocess_fn: Callable[[Any], Any],
+) -> np.ndarray:
     # Ensure RGB
     img = img_pil.convert("RGB")
 
@@ -89,12 +127,11 @@ def preprocess_image(img_pil: Image.Image, size: tuple[int, int], prep_func: Fun
 
     # Add the "batch" dimension
     img_array = np.expand_dims(img_array, axis=0)
-    
-    # --- THIS IS THE FIX ---
-    # Apply the correct model-specific preprocessing
-    img_preprocessed = prep_func(img_array)
 
-    return img_preprocessed
+    # Apply model-specific preprocessing
+    img_array = preprocess_fn(img_array)
+
+    return img_array
 
 
 # --- 4. THE UPLOAD WIDGET ---
@@ -116,7 +153,7 @@ if uploaded_file is not None:
     processed_image = preprocess_image(
         image,
         size=selected_model_cfg["size"],
-        prep_func=selected_model_cfg["prep_func"]
+        preprocess_fn=get_preprocess_fn(selected_model_cfg["family"]),
     )
 
     # 3. Make a prediction
