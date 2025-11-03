@@ -37,22 +37,18 @@ with st.expander("Real-time settings", expanded=False):
         st.session_state["realtime_poll_hz"] = fps
     with col2:
         st.caption("Static ROI (relative)")
-        roi_x = st.slider(
+        st.session_state["roi_x"] = roi_x = st.slider(
             "ROI X", 0.0, 1.0, float(st.session_state.get("roi_x", 0.2)), 0.01
         )
-        roi_y = st.slider(
+        st.session_state["roi_y"] = roi_y = st.slider(
             "ROI Y", 0.0, 1.0, float(st.session_state.get("roi_y", 0.2)), 0.01
         )
-        roi_w = st.slider(
+        st.session_state["roi_w"] =  roi_w = st.slider(
             "ROI W", 0.05, 1.0, float(st.session_state.get("roi_w", 0.6)), 0.01
         )
-        roi_h = st.slider(
+        st.session_state["roi_h"] = roi_h = st.slider(
             "ROI H", 0.05, 1.0, float(st.session_state.get("roi_h", 0.6)), 0.01
         )
-        st.session_state["roi_x"] = roi_x
-        st.session_state["roi_y"] = roi_y
-        st.session_state["roi_w"] = roi_w
-        st.session_state["roi_h"] = roi_h
 
 # --- RUN THE WEBRTC STREAMER ---
 ctx = webrtc_streamer(
@@ -71,10 +67,10 @@ if ctx and ctx.video_processor:
     vp.set_model(st.session_state["model_choice"])  # change model live if needed
     vp.set_fps(float(st.session_state.get("realtime_poll_hz", 5)))
     vp.set_roi(
-        float(st.session_state.get("roi_x", 0.2)),
-        float(st.session_state.get("roi_y", 0.2)),
-        float(st.session_state.get("roi_w", 0.6)),
-        float(st.session_state.get("roi_h", 0.6)),
+        float(roi_x),
+        float(roi_y),
+        float(roi_w),
+        float(roi_h),
     )
     vp.set_pick_latest(True)
 
