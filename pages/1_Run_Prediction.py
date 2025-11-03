@@ -3,13 +3,14 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import os
+
 # Import all our helper functions from utils.py
 from utils import (
-    MODEL_CONFIG, 
-    load_my_model, 
-    load_my_labels, 
-    get_preprocess_fn, 
-    preprocess_image
+    MODEL_CONFIG,
+    load_my_model,
+    load_my_labels,
+    get_preprocess_fn,
+    preprocess_image,
 )
 
 # --- SET UP THE PAGE ---
@@ -72,7 +73,7 @@ if uploaded_file is not None:
     # For animated images (GIF/TIFF), use the first frame
     if getattr(image, "is_animated", False):
         image.seek(0)
-    st.image(image, caption="You uploaded this image:", width='stretch')
+    st.image(image, caption="You uploaded this image:", width="stretch")
     st.write("")
 
     # 2. Preprocess the image

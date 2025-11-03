@@ -10,3 +10,4 @@ kagglehub
 opencv-python
 opencv-python-headless
 streamlit-webrtc
+av

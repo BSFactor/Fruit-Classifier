@@ -4,13 +4,13 @@ import numpy as np
 import os
 
 from utils import (
-    MODEL_CONFIG, 
-    load_my_model, 
-    load_my_labels, 
-    get_preprocess_fn, 
+    MODEL_CONFIG,
+    load_my_model,
+    load_my_labels,
+    get_preprocess_fn,
     preprocess_image,
     make_gradcam_heatmap,
-    generate_gradcam_overlay
+    generate_gradcam_overlay,
 )
 
 st.title("Grad-CAM Explorer")
@@ -60,20 +60,18 @@ if uploaded_file is not None:
 
         # Generate Grad-CAM
         heatmap = make_gradcam_heatmap(
-            processed_image_array, 
-            model, 
-            selected_model_cfg["last_conv_layer"]
+            processed_image_array, model, selected_model_cfg["last_conv_layer"]
         )
-        
+
         # Create the overlay
         overlay_image = generate_gradcam_overlay(image, heatmap)
 
     st.success(f"**Prediction:** {pred_label} ({confidence:.2f}%)")
     st.caption(f"Model: {selected_model_name}")
-    
+
     # --- DISPLAY RESULTS ---
     col1, col2 = st.columns(2)
     with col1:
-        st.image(image, caption="Original Image", use_container_width =True)
+        st.image(image, caption="Original Image", width='stretch')
     with col2:
-        st.image(overlay_image, caption="Grad-CAM Heatmap", use_container_width =True)
+        st.image(overlay_image, caption="Grad-CAM Heatmap", width='stretch')
