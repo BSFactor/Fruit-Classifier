@@ -8,3 +8,5 @@ scikit-learn
 streamlit
 kagglehub
 opencv-python
+opencv-python-headless
+streamlit-webrtc

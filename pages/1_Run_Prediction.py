@@ -1,38 +1,22 @@
-from typing import Any, Callable, TypedDict
+from typing import Any
 import streamlit as st
-import keras  # type: ignore[import]  # New Keras: import directly; no TensorFlow import needed
 from PIL import Image
 import numpy as np
-import json
 import os
+# Import all our helper functions from utils.py
+from utils import (
+    MODEL_CONFIG, 
+    load_my_model, 
+    load_my_labels, 
+    get_preprocess_fn, 
+    preprocess_image
+)
 
-# --- 1. SET UP THE PAGE ---
+# --- SET UP THE PAGE ---
 st.set_page_config(page_title="Fruit Classifier", layout="centered")
 st.title("Fruit Vegetable Classifier")
 st.write("Upload an image of a fruit or vegetable, and we shall find out what it is")
 
-
-class ModelConfig(TypedDict):
-    file: str
-    size: tuple[int, int]
-    # name for selecting correct preprocessing
-    family: str
-
-
-# --- 2. LOAD THE MODEL AND LABELS ---
-
-MODEL_CONFIG: dict[str, ModelConfig] = {
-    "MobileNetV2": {
-        "file": "mobilenet_model.keras",
-        "size": (224, 224),
-        "family": "mobilenet_v2",
-    },
-    "EfficientNetV2B0": {
-        "file": "efficientnet_model.keras",
-        "size": (224, 224),
-        "family": "efficientnet_v2",
-    },
-}
 
 # Choose which model to use
 # Initialize default model in session state
@@ -73,66 +57,8 @@ if not os.path.exists("labels.json"):
     st.error("Required file 'labels.json' not found in app directory.")
     st.stop()
 
-
-@st.cache_resource
-def load_my_model(model_path_in: str) -> Any:
-    loaded_model = keras.models.load_model(model_path_in)
-    assert loaded_model is not None
-    return loaded_model
-
-
-@st.cache_data
-def load_my_labels():
-    with open("labels.json", "r", encoding="utf-8") as f:
-        # Load the dictionary and convert string keys back to integers
-        labels_from_json = json.load(f)
-        label_map = {int(k): v for k, v in labels_from_json.items()}
-    return label_map
-
-
 model = load_my_model(model_path_in=model_path)
 labels = load_my_labels()
-
-
-# --- 3. PREPROCESSING FUNCTION ---
-def get_preprocess_fn(family: str) -> Callable[[Any], Any]:
-    """Return the appropriate preprocess_input function for a given model family.
-
-    Supported families: 'mobilenet_v2', 'efficientnet_v2'.
-    Raises:
-        ValueError: if the provided family is not supported.
-    """
-    if family == "mobilenet_v2":
-        return keras.applications.mobilenet_v2.preprocess_input
-    if family == "efficientnet_v2":
-        return keras.applications.efficientnet_v2.preprocess_input
-    raise ValueError(
-        f"Unsupported model family '{family}'. Supported: 'mobilenet_v2', 'efficientnet_v2'."
-    )
-
-
-def preprocess_image(
-    img_pil: Image.Image,
-    size: tuple[int, int],
-    preprocess_fn: Callable[[Any], Any],
-) -> np.ndarray:
-    # Ensure RGB
-    img = img_pil.convert("RGB")
-
-    # Resize the image
-    img = img.resize(size)
-
-    # Convert to numpy array
-    img_array = np.array(img)
-
-    # Add the "batch" dimension
-    img_array = np.expand_dims(img_array, axis=0)
-
-    # Apply model-specific preprocessing
-    img_array = preprocess_fn(img_array)
-
-    return img_array
-
 
 # --- 4. THE UPLOAD WIDGET ---
 uploaded_file = st.file_uploader(
