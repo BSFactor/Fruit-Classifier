@@ -35,7 +35,7 @@ st.selectbox(
 class FruitClassifierProcessor(VideoProcessorBase):
     def __init__(self) -> None:
         # Load the model and labels
-        self.model_name = st.session_state["model_choice"]
+        self.model_name = st.session_state.get("model_choice", "MobileNetV2")
         self.model_config = MODEL_CONFIG[self.model_name]
         self.model = load_my_model(self.model_config["file"])
         self.labels = load_my_labels()
