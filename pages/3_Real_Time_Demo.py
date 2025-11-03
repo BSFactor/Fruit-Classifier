@@ -6,9 +6,9 @@ import av
 from PIL import Image
 
 from utils import (
-    MODEL_CONFIG, 
-    load_my_model, 
-    load_my_labels, 
+    MODEL_CONFIG,
+    load_my_model,
+    load_my_labels,
     get_preprocess_fn,
 )
 
@@ -32,6 +32,7 @@ st.selectbox(
 
 # --- VIDEO PROCESSING CLASS ---
 
+
 class FruitClassifierProcessor(VideoProcessorBase):
     def __init__(self) -> None:
         # Load the model and labels
@@ -48,12 +49,12 @@ class FruitClassifierProcessor(VideoProcessorBase):
 
         # --- PREPROCESS THE FRAME ---
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
+
         img_resized = cv2.resize(img_rgb, self.size)
-        
+
         # Batch dimension
         img_array = np.expand_dims(img_resized, axis=0)
-        
+
         # Apply model-specific preprocessing
         img_preprocessed = self.preprocess_fn(img_array)
 
@@ -66,7 +67,7 @@ class FruitClassifierProcessor(VideoProcessorBase):
         # --- DRAW ON FRAME ---
         # Draw the prediction text on the *original* BGR frame
         text = f"{pred_label} ({confidence:.2f})"
-        
+
         cv2.putText(
             img,  # Draw on the original BGR frame
             text,
@@ -91,4 +92,6 @@ webrtc_streamer(
     media_stream_constraints={"video": True, "audio": False},
 )
 
-st.caption(f"Using {st.session_state['model_choice']} model. Change model and restart webcam.")
+st.caption(
+    f"Using {st.session_state['model_choice']} model. Change model and restart webcam."
+)

@@ -8,6 +8,7 @@ import numpy as np
 import json
 import cv2
 
+
 # --- MODEL CONFIGURATION ---
 class ModelConfig(TypedDict):
     file: str
@@ -15,9 +16,12 @@ class ModelConfig(TypedDict):
     family: str
     last_conv_layer: str
 
+
 # Import the specific preprocessing functions
 from keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
-from keras.applications.efficientnet_v2 import preprocess_input as efficientnet_v2_preprocess
+from keras.applications.efficientnet_v2 import (
+    preprocess_input as efficientnet_v2_preprocess,
+)
 
 MODEL_CONFIG: dict[str, ModelConfig] = {
     "MobileNetV2": {
@@ -36,11 +40,13 @@ MODEL_CONFIG: dict[str, ModelConfig] = {
 
 # --- CACHED HELPER FUNCTIONS ---
 
+
 @st.cache_resource
 def load_my_model(model_path_in: str) -> Any:
     loaded_model = keras.models.load_model(model_path_in)
     assert loaded_model is not None
     return loaded_model
+
 
 @st.cache_data
 def load_my_labels():
@@ -49,7 +55,9 @@ def load_my_labels():
         label_map = {int(k): v for k, v in labels_from_json.items()}
     return label_map
 
+
 # --- PREPROCESSING FUNCTIONS ---
+
 
 def get_preprocess_fn(family: str) -> Callable[[Any], Any]:
     if family == "mobilenet_v2":
@@ -57,6 +65,7 @@ def get_preprocess_fn(family: str) -> Callable[[Any], Any]:
     if family == "efficientnet_v2":
         return keras.applications.efficientnet_v2.preprocess_input
     raise ValueError(f"Unsupported model family '{family}'.")
+
 
 def preprocess_image(
     img_pil: Image.Image,
@@ -80,16 +89,17 @@ def preprocess_image(
 
     return img_array
 
+
 # --- GRAD-CAM LOGIC ---
+
 
 def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
     grad_model = Model(
-        model.inputs,
-        [model.get_layer(last_conv_layer_name).output, model.output]
+        model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
     )
 
     with tf.GradientTape() as tape:
-        conv_outputs, predictions = grad_model([img_array]) 
+        conv_outputs, predictions = grad_model([img_array])
 
         if isinstance(predictions, list):
             predictions_tensor = predictions[0]
@@ -97,8 +107,8 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None
             predictions_tensor = predictions
 
         if pred_index is None:
-            pred_index = tf.argmax(predictions_tensor[0]) 
-        
+            pred_index = tf.argmax(predictions_tensor[0])
+
         class_channel = predictions_tensor[:, pred_index]
 
     grads = tape.gradient(class_channel, conv_outputs)
@@ -110,7 +120,9 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None
     heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
     return heatmap.numpy()
 
+
 # --- GRAD-CAM DISPLAY FUNCTION ---
+
 
 def generate_gradcam_overlay(img_pil: Image.Image, heatmap: np.ndarray, alpha=0.4):
     """
@@ -119,18 +131,18 @@ def generate_gradcam_overlay(img_pil: Image.Image, heatmap: np.ndarray, alpha=0.
     """
     # Convert original PIL image to NumPy array (RGB)
     img_rgb = np.array(img_pil.convert("RGB"))
-    
+
     # Resize heatmap to match original image
     heatmap_resized = cv2.resize(heatmap, (img_rgb.shape[1], img_rgb.shape[0]))
-    
+
     # Rescale heatmap to 0-255 and apply colormap
     heatmap_8bit = np.uint8(255 * heatmap_resized)
     heatmap_color = cv2.applyColorMap(heatmap_8bit, cv2.COLORMAP_JET)
-    
+
     # Convert heatmap to RGB.
     heatmap_rgb = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
 
     # Blend the original image with the heatmap
     superimposed_img = cv2.addWeighted(heatmap_rgb, alpha, img_rgb, 1 - alpha, 0)
-    
+
     return superimposed_img
