@@ -5,7 +5,7 @@ st.set_page_config(page_title="Fruit Classifier - Home", layout="centered")
 
 st.title("Fruit & Vegetable Classifier")
 
-st.write("""
+st.subheader("""
 Welcome to the Fruit and Vegetable Classification project.
 
 **Select a demo from the sidebar on the left** to get cooking.
@@ -13,7 +13,7 @@ Welcome to the Fruit and Vegetable Classification project.
 
 st.header("Project Features")
 st.markdown("""
-* **Classifier Demo:** Upload an image and see predictions from both MobileNetV2 and EfficientNetV2-B0.
+* **Run Prediction:** Upload an image and see predictions from both MobileNetV2 and EfficientNetV2-B0.
 * **(Coming Soon) Grad-CAM:** See a heatmap of *why* the model made its prediction.
 * **(Not here yet lol) Notebooks:** View the original Colab notebooks used to train the models.
 """)
