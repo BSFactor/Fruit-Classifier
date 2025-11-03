@@ -72,7 +72,7 @@ if uploaded_file is not None:
     # For animated images (GIF/TIFF), use the first frame
     if getattr(image, "is_animated", False):
         image.seek(0)
-    st.image(image, caption="You uploaded this image:", use_container_width=True)
+    st.image(image, caption="You uploaded this image:", width='stretch')
     st.write("")
 
     # 2. Preprocess the image
