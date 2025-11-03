@@ -173,7 +173,9 @@ def make_gradcam_heatmap(
 # --- GRAD-CAM DISPLAY FUNCTION ---
 
 
-def generate_gradcam_overlay(img_pil: Image.Image, heatmap: np.ndarray, alpha=0.4) -> npt.NDArray[np.uint8]:
+def generate_gradcam_overlay(
+    img_pil: Image.Image, heatmap: np.ndarray, alpha=0.4
+) -> npt.NDArray[np.uint8]:
     """
     Overlays a heatmap on the original PIL image.
     This works IN-MEMORY, no files are saved.

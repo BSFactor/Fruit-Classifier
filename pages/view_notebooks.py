@@ -16,6 +16,7 @@ st.write(
     "Use the selector to switch view between the training and evaluation notebooks."
 )
 
+
 @st.cache_data(show_spinner=False)
 def render_notebook_to_html(path: str, _mtime: float, theme: str) -> str:
     """Render a .ipynb to HTML. Cached by file modification time."""
@@ -30,6 +31,7 @@ def render_notebook_to_html(path: str, _mtime: float, theme: str) -> str:
         exporter.theme = "dark" if theme == "dark" else "light"
     body, _resources = exporter.from_notebook_node(nb)
     return body
+
 
 choice = st.radio(
     "Choose which notebook to display:",
@@ -47,7 +49,7 @@ else:
 
 if os.path.exists(notebook_path):
     mtime = os.path.getmtime(notebook_path)
-    page_theme = st.get_option("theme.base") or "light"
+    page_theme = st.context.theme.type or "light"
     html_data = render_notebook_to_html(notebook_path, mtime, page_theme)
     components.html(html_data, height=800, scrolling=True)
 else:
