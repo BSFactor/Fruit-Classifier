@@ -43,10 +43,14 @@ The application is run using Streamlit. The main entry point is `Home.py`.
     ```pwsh
     streamlit run app.py
     ```
+3.  Your default web browser will automatically open to the application's URL.
+4.  Use the navigation sidebar to select a feature.
 
-3. Your default web browser will automatically open to the application's URL.
-4. Use the navigation sidebar to select a feature.
+## Full Project Report
 
+For a detailed breakdown of the methodology, model training, evaluation, and outcomes, please see the full report.
+
+[**Full Project Report (PDF)**](Group_45_Report.pdf)
 ---
 
 i LOVE stupid readmes
