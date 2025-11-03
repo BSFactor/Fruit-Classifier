@@ -14,6 +14,6 @@ Welcome to the Fruit and Vegetable Classification project.
 st.header("Project Features")
 st.markdown("""
 * **Run Prediction:** Upload an image and see predictions from both MobileNetV2 and EfficientNetV2-B0.
-* **(Coming Soon) Grad-CAM:** See a heatmap of *why* the model made its prediction.
+* **Grad-CAM:** See a heatmap of *why* the model made its prediction.
 * **Notebooks:** View the original Colab notebooks used to train the models.
 """)

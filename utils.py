@@ -63,10 +63,21 @@ def preprocess_image(
     size: tuple[int, int],
     preprocess_fn: Callable[[Any], Any],
 ) -> np.ndarray:
-    img = img_pil.convert("RGB").resize(size)
+    # Ensure RGB
+    img = img_pil.convert("RGB")
+
+    # Resize the image
+    img = img.resize(size)
+
+    # Convert to numpy array
     img_array = np.array(img)
+
+    # Add the "batch" dimension
     img_array = np.expand_dims(img_array, axis=0)
+
+    # Apply model-specific preprocessing
     img_array = preprocess_fn(img_array)
+
     return img_array
 
 # --- GRAD-CAM LOGIC ---
