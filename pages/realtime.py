@@ -43,7 +43,7 @@ with st.expander("Real-time settings", expanded=False):
         st.session_state["roi_y"] = roi_y = st.slider(
             "ROI Y", 0.0, 1.0, float(st.session_state.get("roi_y", 0.2)), 0.01
         )
-        st.session_state["roi_w"] =  roi_w = st.slider(
+        st.session_state["roi_w"] = roi_w = st.slider(
             "ROI W", 0.05, 1.0, float(st.session_state.get("roi_w", 0.6)), 0.01
         )
         st.session_state["roi_h"] = roi_h = st.slider(

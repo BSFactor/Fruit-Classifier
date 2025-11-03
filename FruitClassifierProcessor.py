@@ -77,10 +77,12 @@ class FruitClassifierProcessor(VideoProcessorBase):
             float(np.clip(w, 0.0, 1.0)),
             float(np.clip(h, 0.0, 1.0)),
         )
+
     # ROI change takes effect on next frame overlay
 
     def set_pick_latest(self, val: bool) -> None:
         self.pick_latest = bool(val)
+
     # Affects which queued frame is chosen for latest update
 
     def _draw_overlay(self, img_bgr: np.ndarray) -> None:
