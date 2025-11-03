@@ -1,16 +1,10 @@
-import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-import numpy as np
-import cv2
 import av
-from PIL import Image
+import cv2
+import numpy as np
+import streamlit as st
+from streamlit_webrtc import RTCConfiguration, VideoProcessorBase, webrtc_streamer
 
-from utils import (
-    MODEL_CONFIG,
-    load_my_model,
-    load_my_labels,
-    get_preprocess_fn,
-)
+from utils import MODEL_CONFIG, get_preprocess_fn, load_my_labels, load_my_model
 
 st.set_page_config(page_title="Real-Time Demo", layout="centered")
 st.title("Real-Time Classifier")
@@ -61,7 +55,7 @@ class FruitClassifierProcessor(VideoProcessorBase):
         # --- PREDICT ---
         predictions = self.model.predict(img_preprocessed)[0]
         pred_index = np.argmax(predictions)
-        pred_label = self.labels[pred_index]
+        pred_label = self.labels[int(pred_index)]
         confidence = np.max(predictions)
 
         # --- DRAW ON FRAME ---

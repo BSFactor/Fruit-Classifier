@@ -1,16 +1,15 @@
+import numpy as np
 import streamlit as st
 from PIL import Image
-import numpy as np
-import os
 
 from utils import (
     MODEL_CONFIG,
-    load_my_model,
-    load_my_labels,
-    get_preprocess_fn,
-    preprocess_image,
-    make_gradcam_heatmap,
     generate_gradcam_overlay,
+    get_preprocess_fn,
+    load_my_labels,
+    load_my_model,
+    make_gradcam_heatmap,
+    preprocess_image,
 )
 
 st.title("Grad-CAM Explorer")
@@ -72,6 +71,6 @@ if uploaded_file is not None:
     # --- DISPLAY RESULTS ---
     col1, col2 = st.columns(2)
     with col1:
-        st.image(image, caption="Original Image", width='stretch')
+        st.image(image, caption="Original Image", width="stretch")
     with col2:
-        st.image(overlay_image, caption="Grad-CAM Heatmap", width='stretch')
+        st.image(overlay_image, caption="Grad-CAM Heatmap", width="stretch")

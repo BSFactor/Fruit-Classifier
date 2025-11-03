@@ -1,12 +1,13 @@
-from typing import Any, Callable, TypedDict
-import streamlit as st
-import keras
-from keras.models import Model
-import tensorflow as tf
-from PIL import Image
-import numpy as np
 import json
+from typing import Any, Callable, TypedDict
+
 import cv2
+import keras
+import numpy as np
+import streamlit as st
+import tensorflow as tf
+from keras.models import Model
+from PIL import Image
 
 
 # --- MODEL CONFIGURATION ---
@@ -18,10 +19,6 @@ class ModelConfig(TypedDict):
 
 
 # Import the specific preprocessing functions
-from keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
-from keras.applications.efficientnet_v2 import (
-    preprocess_input as efficientnet_v2_preprocess,
-)
 
 MODEL_CONFIG: dict[str, ModelConfig] = {
     "MobileNetV2": {

@@ -1,15 +1,15 @@
-from typing import Any
+import os
+
+import numpy as np
 import streamlit as st
 from PIL import Image
-import numpy as np
-import os
 
 # Import all our helper functions from utils.py
 from utils import (
     MODEL_CONFIG,
-    load_my_model,
-    load_my_labels,
     get_preprocess_fn,
+    load_my_labels,
+    load_my_model,
     preprocess_image,
 )
 
