@@ -1,4 +1,3 @@
-import logging
 import threading
 import time
 from typing import Optional
@@ -6,6 +5,7 @@ from typing import Optional
 import av
 import cv2
 import numpy as np
+import streamlit.logger
 from keras import Model  # type: ignore[import]
 from streamlit_webrtc import VideoProcessorBase
 
@@ -15,7 +15,7 @@ from utils.preprocessing import get_preprocess_fn
 
 __all__ = ["FruitClassifierProcessor"]
 
-logger = logging.getLogger(__name__)
+logger = streamlit.logger.get_logger(__name__)
 
 
 class FruitClassifierProcessor(VideoProcessorBase):
@@ -75,7 +75,6 @@ class FruitClassifierProcessor(VideoProcessorBase):
     def set_fps(self, fps: float) -> None:
         if fps and fps > 0:
             self.poll_interval_s = max(1.0 / float(fps), 0.001)
-            # pacing change handled by worker; no redraw flag needed
 
     def set_roi(self, x: float, y: float, w: float, h: float) -> None:
         self.roi_rel = (
@@ -150,11 +149,8 @@ class FruitClassifierProcessor(VideoProcessorBase):
         img_array = np.expand_dims(roi_resized, axis=0)
         img_preprocessed = self.preprocess_fn(img_array)
 
-        # Suppress potential progress bar spam if supported; fallback otherwise
-        try:
-            predictions = self.model.predict(img_preprocessed, verbose=0)[0]  # type: ignore[call-arg]
-        except TypeError:
-            predictions = self.model.predict(img_preprocessed)[0]
+        # Suppress potential progress bar spam
+        predictions = self.model.predict(img_preprocessed, verbose=0)[0]  # type: ignore
         pred_index = int(np.argmax(predictions))
         pred_label = self.labels.get(pred_index, str(pred_index))
         confidence = float(np.max(predictions))

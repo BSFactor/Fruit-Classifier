@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import numpy.typing as npt
-import tensorflow as tf
+import tensorflow as tf  # type: ignore[import]
 from keras.models import Model  # type: ignore[import]
 from PIL import Image
 
@@ -40,9 +40,9 @@ def generate_gradcam_overlay(
 
 def make_gradcam_heatmap(
     img_array: np.typing.NDArray,
-    model: Model,
+    model,
     last_conv_layer_name: str,
-    pred_index: int | tf.Tensor | None = None,
+    pred_index=None,
 ) -> np.typing.NDArray:
     """Compute a Grad-CAM heatmap for a given input and model.
 
@@ -55,6 +55,7 @@ def make_gradcam_heatmap(
     6) Weight the conv feature maps by those channel weights and sum over channels.
     7) ReLU and normalize to [0, 1].
     """
+
     grad_model = Model(
         model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
     )
