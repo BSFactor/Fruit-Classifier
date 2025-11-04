@@ -14,6 +14,11 @@ st.write(
 )
 
 
+# Source .ipynb notebooks
+TRAIN_NOTEBOOK_PATH = "notebooks/Fruit_Classification.ipynb"
+EVAL_NOTEBOOK_PATH = "notebooks/Fruit_Classification_Inference.ipynb"
+
+
 choice = st.radio(
     "Choose which notebook to display:",
     ("Training", "Evaluation"),
