@@ -1,15 +1,16 @@
-from typing import Any
+import os
+
+import numpy as np
 import streamlit as st
 from PIL import Image
-import numpy as np
-import os
 
 # Import all our helper functions from utils.py
 from utils import (
+    IMAGE_EXTENSIONS,
     MODEL_CONFIG,
-    load_my_model,
-    load_my_labels,
     get_preprocess_fn,
+    load_my_labels,
+    load_my_model,
     preprocess_image,
 )
 
@@ -64,7 +65,7 @@ labels = load_my_labels()
 # --- 4. THE UPLOAD WIDGET ---
 uploaded_file = st.file_uploader(
     "Choose an image...",
-    type=["jpg", "jpeg", "png", "webp", "bmp", "tif", "tiff", "gif", "ico"],
+    type=IMAGE_EXTENSIONS,
 )
 
 if uploaded_file is not None:

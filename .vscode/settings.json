@@ -1,0 +1,3 @@
+{
+  "pylint.args": ["--extension-pkg-allow-list=cv2,tensorflow", "--generated-members=cv2.*"]
+}
