@@ -9,7 +9,9 @@ import numpy as np
 from keras import Model  # type: ignore[import]
 from streamlit_webrtc import VideoProcessorBase
 
-from utils import MODEL_CONFIG, get_preprocess_fn, load_my_labels, load_my_model
+from utils import get_preprocess_fn
+from utils.cache import load_my_labels, load_my_model
+from utils.config import MODEL_CONFIG
 
 logger = logging.getLogger(__name__)
 

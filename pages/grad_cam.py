@@ -3,15 +3,12 @@ import streamlit as st
 from PIL import Image
 
 from utils import (
-    IMAGE_EXTENSIONS,
-    MODEL_CONFIG,
-    generate_gradcam_overlay,
     get_preprocess_fn,
-    load_my_labels,
-    load_my_model,
-    make_gradcam_heatmap,
     preprocess_image,
 )
+from utils.cache import load_my_labels, load_my_model
+from utils.config import IMAGE_EXTENSIONS, MODEL_CONFIG
+from utils.grad_cam import generate_gradcam_overlay, make_gradcam_heatmap
 
 st.title("Grad-CAM Explorer")
 st.write("See *why* a model is making its prediction.")

@@ -1,0 +1,88 @@
+import cv2
+import numpy as np
+import numpy.typing as npt
+import tensorflow as tf
+from keras.models import Model  # type: ignore[import]
+from PIL import Image
+
+# --- GRAD-CAM DISPLAY FUNCTION ---
+
+
+def generate_gradcam_overlay(
+    img_pil: Image.Image, heatmap: np.ndarray, alpha=0.4
+) -> npt.NDArray[np.uint8]:
+    """
+    Overlays a heatmap on the original PIL image.
+    This works IN-MEMORY, no files are saved.
+    """
+    # Convert original PIL image to NumPy array (RGB)
+    img_rgb = np.array(img_pil.convert("RGB"))
+
+    # Resize heatmap to match original image
+    heatmap_resized = cv2.resize(heatmap, (img_rgb.shape[1], img_rgb.shape[0]))
+
+    # Rescale heatmap to 0-255 and apply colormap
+    heatmap_8bit = (255 * heatmap_resized).astype(np.uint8, copy=False)
+    heatmap_color = cv2.applyColorMap(heatmap_8bit, cv2.COLORMAP_JET)
+
+    # Convert heatmap to RGB.
+    heatmap_rgb = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
+
+    # Blend the original image with the heatmap
+    superimposed_img = cv2.addWeighted(heatmap_rgb, alpha, img_rgb, 1 - alpha, 0)
+
+    return superimposed_img.astype(np.uint8, copy=False)
+
+
+# --- GRAD-CAM LOGIC ---
+
+
+def make_gradcam_heatmap(
+    img_array: np.typing.NDArray,
+    model: Model,
+    last_conv_layer_name: str,
+    pred_index: int | tf.Tensor | None = None,
+) -> np.typing.NDArray:
+    """Compute a Grad-CAM heatmap for a given input and model.
+
+    Steps (high level):
+    1) Build a sub-model that outputs both the last conv layer feature maps and the final predictions.
+    2) Forward-pass the image to get those tensors.
+    3) If no class index is provided, pick the top-predicted class.
+    4) Compute gradients of the selected class score w.r.t. the conv feature maps.
+    5) Global-average-pool the gradients across spatial dims to obtain channel weights.
+    6) Weight the conv feature maps by those channel weights and sum over channels.
+    7) ReLU and normalize to [0, 1].
+    """
+    grad_model = Model(
+        model.inputs, [model.get_layer(last_conv_layer_name).output, model.output]
+    )
+
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model([img_array])
+
+        if isinstance(predictions, list):
+            predictions_tensor = predictions[0]
+        else:
+            predictions_tensor = predictions
+
+        if pred_index is None:
+            pred_index = tf.argmax(predictions_tensor[0])
+
+        class_channel = predictions_tensor[:, pred_index]
+
+    # Gradients of the target class score w.r.t. conv feature maps
+    grads = tape.gradient(class_channel, conv_outputs)
+
+    # Global-average pool gradients over spatial dims -> channel weights, shape (C,)
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+
+    # Feature maps for this image, shape (H, W, C)
+    conv_outputs = conv_outputs[0]
+
+    # Channel-wise weighted sum: sum_c (A[:, :, c] * w[c]) -> shape (H, W)
+    # This is equivalent to a tensordot over the channel axis but clearer for type checkers
+    heatmap = tf.reduce_sum(conv_outputs * pooled_grads, axis=-1)
+
+    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    return heatmap.numpy()

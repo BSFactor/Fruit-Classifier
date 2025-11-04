@@ -4,15 +4,14 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
-# Import all our helper functions from utils.py
 from utils import (
-    IMAGE_EXTENSIONS,
-    MODEL_CONFIG,
     get_preprocess_fn,
-    load_my_labels,
-    load_my_model,
     preprocess_image,
 )
+from utils.cache import load_my_labels, load_my_model
+
+# Import all our helper functions from utils.py
+from utils.config import IMAGE_EXTENSIONS, MODEL_CONFIG
 
 # --- SET UP THE PAGE ---
 st.set_page_config(page_title="Fruit Classifier", layout="centered")

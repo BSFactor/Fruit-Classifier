@@ -1,10 +1,11 @@
+import typing
 from typing import Any, cast
 
 import streamlit as st
-from streamlit_webrtc import RTCConfiguration, webrtc_streamer
+from streamlit_webrtc import RTCConfiguration, VideoProcessorFactory, webrtc_streamer
 
-from FruitClassifierProcessor import FruitClassifierProcessor
-from utils import MODEL_CONFIG
+from utils.config import MODEL_CONFIG
+from utils.video_processing import FruitClassifierProcessor
 
 st.set_page_config(page_title="Real-Time Demo", layout="centered")
 st.title("Real-Time Classifier")
@@ -28,13 +29,12 @@ st.selectbox(
 with st.expander("Real-time settings", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
-        fps = st.slider(
+        st.session_state["realtime_poll_hz"] = fps = st.slider(
             "Polling rate (FPS)",
             min_value=1,
             max_value=30,
             value=int(st.session_state.get("realtime_poll_hz", 5)),
         )
-        st.session_state["realtime_poll_hz"] = fps
     with col2:
         st.caption("Static ROI (relative)")
         st.session_state["roi_x"] = roi_x = st.slider(
@@ -53,7 +53,7 @@ with st.expander("Real-time settings", expanded=False):
 # --- RUN THE WEBRTC STREAMER ---
 ctx = webrtc_streamer(
     key="realtime_classifier",
-    video_processor_factory=cast(Any, FruitClassifierProcessor),
+    video_processor_factory=cast(VideoProcessorFactory, FruitClassifierProcessor),
     rtc_configuration=RTCConfiguration(
         {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
     ),
@@ -63,9 +63,9 @@ ctx = webrtc_streamer(
 
 # Push settings into the processor (avoid using Streamlit from the processor thread)
 if ctx and ctx.video_processor:
-    vp = ctx.video_processor
+    vp = typing.cast(FruitClassifierProcessor, ctx.video_processor)
     vp.set_model(st.session_state["model_choice"])  # change model live if needed
-    vp.set_fps(float(st.session_state.get("realtime_poll_hz", 5)))
+    vp.set_fps(float(fps))
     vp.set_roi(
         float(roi_x),
         float(roi_y),
