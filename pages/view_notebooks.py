@@ -4,8 +4,14 @@ from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
+import streamlit.logger
 
-from utils.notebook_rendering import render_notebook_to_html, render_notebook_to_pdf
+from utils import notebook_rendering
+from utils.notebook_rendering import (
+    Strategy,
+    render_notebook_to_html,
+    render_notebook_to_pdf,
+)
 
 st.set_page_config(page_title="Project Notebooks", layout="wide")
 st.title("Project Notebooks")
@@ -13,7 +19,7 @@ st.write(
     "Use the selector to switch view between the training and evaluation notebooks."
 )
 
-
+logger = streamlit.logger.get_logger(__name__)
 # Source .ipynb notebooks
 TRAIN_NOTEBOOK_PATH = "notebooks/Fruit_Classification.ipynb"
 EVAL_NOTEBOOK_PATH = "notebooks/Fruit_Classification_Inference.ipynb"
@@ -69,21 +75,22 @@ if os.path.exists(notebook_path):
         stored = st.session_state.pdf_store.get(key)
 
         def _render_now():
-            result = render_notebook_to_pdf(notebook_path, mtime, nb_theme)
+            # with notebook_rendering.force(Strategy.QTPDF):
+            #     # Clear only the PDF function cache so strategy changes take effect
+            # render_notebook_to_pdf.clear()
+            result = render_notebook_to_pdf(notebook_path, mtime)
+            # logger.info(notebook_rendering.get_pdf_debug())
             if result is None:
                 st.session_state.pdf_store[key] = {"error": "No PDF exporter available"}
             else:
-                pdf_bytes, final_theme = result
-                st.session_state.pdf_store[key] = {
-                    "bytes": pdf_bytes,
-                    "final_theme": final_theme,
-                }
+                pdf_bytes = result
+                st.session_state.pdf_store[key] = {"bytes": pdf_bytes}
 
         if stored and stored.get("bytes"):
             st.download_button(
                 label="Download PDF",
                 data=stored["bytes"],
-                file_name=f"{base_no_ext}{'.' + stored.get('final_theme') if stored.get('final_theme') else ''}.pdf",
+                file_name=f"{base_no_ext}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
             )
