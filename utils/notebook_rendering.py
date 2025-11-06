@@ -1,10 +1,10 @@
 import contextlib
 import enum
+import re
 import sys
 from copy import deepcopy
-from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Optional, ParamSpec, TypeVar, cast
+from typing import Callable, Optional
 
 import nbconvert
 import nbformat
@@ -18,6 +18,7 @@ __all__ = [
     "Strategy",
     "force",
     "get_pdf_debug",
+    "clear_pdf_debug",
 ]
 
 logger = streamlit.logger.get_logger(__name__)
@@ -55,6 +56,14 @@ def get_pdf_debug() -> list[dict]:
     return deepcopy(store if store is not None else _last_pdf_attempts)
 
 
+def clear_pdf_debug() -> None:
+    """Clear stored PDF debug attempts (session-scoped if available)."""
+    store = _session_debug_list()
+    if store is not None:
+        store.clear()
+    _last_pdf_attempts.clear()
+
+
 class Strategy(enum.IntFlag):
     NONE = 0
     TEX = enum.auto()
@@ -68,44 +77,145 @@ default_strategy: Strategy = Strategy.TEX | Strategy.WEBPDF
 
 # giving up is real
 def strategy_influenced[**P, R](
-    s: Strategy,
-    name: str,
-    start_log: Optional[Callable[[], None]] = None,
-    end_log: Optional[Callable[[Any], None]] = None,  # this but Any will work.
-) -> Callable[[Callable[P, R]], Callable[P, R | None]]:
-    def trying():
-        _debug_attempt(name, "try")
+    s: Strategy, name: str
+) -> "Callable[[Callable[P, R]], StrategyInfluenced[P, R]]":
+    return lambda f: StrategyInfluenced(s, name, f)
 
-    start = start_log if start_log is not None else trying
 
-    def log_result(r: R):
-        _debug_attempt(name, "ok" if r is not None else "fail")
+def _forced():
+    return _strategy_enabled is not None
 
-    end = cast(
-        Callable[[R], None],
-        end_log if end_log is not None else log_result,
-    )
 
-    def dec(f: Callable[P, R]) -> Callable[P, R | None]:
-        @wraps(f)
-        def fwraps(*a, **k) -> R | None:
-            # Use default strategy when not forced, but only log debug when forced
-            forced = _strategy_enabled is not None
-            strat: Strategy = (
-                _strategy_enabled if _strategy_enabled is not None else default_strategy
-            )
-            if not (strat & s):
-                return None
+def _effective_strategy() -> Strategy:
+    return _strategy_enabled if _strategy_enabled is not None else default_strategy
+
+
+class MetaStrategyInfluenced(type):
+    @property
+    def forced(cls) -> bool:
+        "class"
+        return _forced()
+
+    @property
+    def effective_strategy(cls) -> Strategy:
+        "class"
+        return _effective_strategy()
+
+
+# how they do this typa decorator class thing so good
+class StrategyInfluenced[**P, R](metaclass=MetaStrategyInfluenced):
+    def __init__(self, s: Strategy, name: str, f: Callable[P, R]) -> None:
+        self._strat = s
+        self.name = name
+
+        def trying():
+            _debug_attempt(self.name, "try")
+
+        def log_result(r: R):
+            _debug_attempt(self.name, "ok" if r is not None else "fail")
+
+        def log_fail(e: Exception):
+            logger.debug("%s failed: %s", self.name, e, stack_info=True)
+            return _debug_attempt(self.name, "fail")
+
+        self._start: Callable[[], None] = trying
+        self._success: Callable[[R], None] = log_result
+        self._fail: Callable[[Exception], None] = log_fail
+
+        self._f = f
+
+        # Snapshots to allow restoring defaults
+        self._default_start = self._start
+        self._default_success = self._success
+        self._default_fail = self._fail
+
+    @property
+    def debug_start(self) -> Callable[[], None]:
+        return self._start
+
+    @debug_start.setter
+    def debug_start(self, fn: Callable[[], None]) -> None:
+        if fn is not None:
+            self._start = fn
+
+    @property
+    def debug_end(self) -> Callable[[R], None]:
+        return self._success
+
+    @debug_end.setter
+    def debug_end(self, fn: Callable[[R], None]) -> None:
+        if fn is not None:
+            self._success = fn
+
+    @property
+    def debug_fail(self) -> Callable[[Exception], None]:
+        return self._fail
+
+    @debug_fail.setter
+    def debug_fail(self, fn: Callable[[Exception], None]) -> None:
+        if fn is not None:
+            self._fail = fn
+
+    # how cant i just use debug_end
+    def bind_end(self, r: Callable[[R], None]):
+        self.debug_end = r
+        return r
+
+    def bind_start(self, r: Callable[[], None]):
+        self.debug_start = r
+        return r
+
+    def bind_fail(self, r: Callable[[Exception], None]):
+        self.debug_fail = r
+        return r
+
+    # Clear/unbind helpers
+    def clear_start(self) -> None:
+        self._start = self._default_start
+
+    def clear_end(self) -> None:
+        self._success = self._default_success
+
+    def clear_fail(self) -> None:
+        self._fail = self._default_fail
+
+    @property
+    def function(self) -> Callable[P, R]:
+        return self._f
+
+    @property
+    def strategy(self) -> Strategy:
+        return self._strat
+
+    def __call__(self, *a: P.args, **k: P.kwargs) -> R | None:
+        # Use default strategy when not forced, but only log debug when forced
+        if not (StrategyInfluenced.effective_strategy & self.strategy):
+            return None
+        forced = StrategyInfluenced.forced
+        if forced:
+            self.debug_start()
+        try:
+            r = self.function(*a, **k)
+        except Exception as e:  # pylint: disable=broad-except
             if forced:
-                start()
-            r = f(*a, **k)
-            if forced:
-                end(r)
-            return r
+                self.debug_fail(e)
+            return None
+        if forced:
+            self.debug_end(r)
+        return r
 
-        return fwraps
+    # @property
+    # def effective_strategy(self) -> Strategy:
+    #     "instance"
+    #     return _effective_strategy()
 
-    return dec
+    # @property
+    # def forced(self) -> bool:
+    #     "instance"
+    #     return _forced()
+
+    # fuck mypy fuck pylint you made me do this instead of type(self)._thing
+    # shadowing is crazy. or the linters stupid.
 
 
 def _build_export_resources(path: str) -> dict:
@@ -128,16 +238,32 @@ def _build_export_resources(path: str) -> dict:
 @strategy_influenced(Strategy.TEX, "TEX")
 def _export_pdf_via_tex(nb: nbformat.NotebookNode, resources: dict) -> Optional[bytes]:
     """Try exporting to PDF via LaTeX PDFExporter."""
-    try:
-        exporter: nbconvert.PDFExporter = nbconvert.PDFExporter()
-        exporter.exclude_input = False
-        exporter.exclude_output = False
-        nbconvert.preprocessors.latex.LatexPreprocessor().preprocess(nb, resources)
-        body, _ = exporter.from_notebook_node(nb, resources=resources)
-        return body
-    except Exception as e:  # pylint: disable=W0718
-        logger.exception("PDFExporter failed: %s", e, exc_info=False)
-        return None
+    from traitlets.config import Config
+
+    c = Config()
+    c.LatexPreprocessor.date = ""
+    exporter: nbconvert.PDFExporter = nbconvert.PDFExporter(config=c)
+    exporter.exclude_input = False
+    exporter.exclude_output = False
+    body, _ = exporter.from_notebook_node(nb, resources=resources)
+    return body
+
+
+@_export_pdf_via_tex.bind_fail
+def _tex_fail(e: Exception):
+    if isinstance(e, nbconvert.exporters.pdf.LatexFailed):
+        note = None
+        missing_re = re.compile(r"! LaTeX Error: File `([^']+)' not found\.")
+        for line in str(e.output).splitlines():
+            m = missing_re.search(line)
+            if m:
+                missing = m.group(1)
+                note = f"install {missing}"
+                break
+    else:
+        note = None
+    logger.error("%s failed: %s", _export_pdf_via_tex.name, e)
+    _debug_attempt(_export_pdf_via_tex.name, "fail", note)
 
 
 @strategy_influenced(Strategy.WEBPDF, "WEBPDF")
@@ -145,17 +271,31 @@ def _export_pdf_via_webpdf(
     nb: nbformat.NotebookNode, resources: dict
 ) -> Optional[bytes]:
     """Try exporting to PDF via WebPDFExporter (nbconvert[webpdf])."""
-    try:
-        exporter2: nbconvert.WebPDFExporter = nbconvert.WebPDFExporter()
-        exporter2.exclude_input = False
-        exporter2.exclude_output = False
+    exporter2: nbconvert.WebPDFExporter = nbconvert.WebPDFExporter()
+    exporter2.exclude_input = False
+    exporter2.exclude_output = False
+    # Allow auto-download of Chromium if playwright hasn't installed it yet.
+    if hasattr(exporter2, "allow_chromium_download"):
+        exporter2.allow_chromium_download = True  # type: ignore[attr-defined]
 
-        # Theme isn't supported reliably for WebPDF; rely on default styling.
-        body, _ = exporter2.from_notebook_node(nb, resources=resources)
-        return body
-    except Exception as e:  # pylint: disable=W0718
-        logger.exception("WebPDFExporter failed: %s", e, exc_info=False)
-        return None
+    # exporter2.allow_chromium_download = True
+
+    # Theme isn't supported reliably for WebPDF; rely on default styling.
+    body, _ = exporter2.from_notebook_node(nb, resources=resources)
+    return body
+
+
+@_export_pdf_via_webpdf.bind_fail
+def _webpdf_fail(e: Exception):  # pragma: no cover
+    # Typical failure reasons: chromium executable missing, playwright not installed.
+    txt = str(e)
+    note: str | None = None
+    if "No suitable chromium executable" in txt:
+        note = "playwright install chromium"
+    elif "Playwright is not installed" in txt:
+        note = "pip install nbconvert[webpdf]"
+    logger.error("%s failed: %s", _export_pdf_via_webpdf.name, e)
+    _debug_attempt(_export_pdf_via_webpdf.name, "fail", note)
 
 
 @strategy_influenced(Strategy.QTPDF, "QTPDF")
@@ -163,16 +303,12 @@ def _export_pdf_via_qtpdf(
     nb: nbformat.NotebookNode, resources: dict
 ) -> Optional[bytes]:
     """Try exporting to PDF via QtPDFExporter (requires PyQt5)."""
-    try:
-        exporter3: nbconvert.QtPDFExporter = nbconvert.QtPDFExporter()
-        exporter3.exclude_input = False
-        exporter3.exclude_output = False
-        # Theme isn't supported reliably for QtPDF; many setups render blank.
-        body, _ = exporter3.from_notebook_node(nb, resources=resources)
-        return body
-    except Exception as e:  # pylint: disable=W0718
-        logger.exception("QtPDFExporter failed: %s", e, exc_info=False)
-        return None
+    exporter3: nbconvert.QtPDFExporter = nbconvert.QtPDFExporter()
+    exporter3.exclude_input = False
+    exporter3.exclude_output = False
+    # Theme isn't supported reliably for QtPDF; many setups render blank.
+    body, _ = exporter3.from_notebook_node(nb, resources=resources)
+    return body
 
 
 @st.cache_data(show_spinner=False)
@@ -221,6 +357,7 @@ def render_notebook_to_pdf(
 
     # 3) Try QtPDFExporter
     body = _export_pdf_via_qtpdf(nb, resources)
+    # how do i know that ts dont ever run
     if body is not None:
         return body
 
@@ -228,17 +365,13 @@ def render_notebook_to_pdf(
 
 
 @contextlib.contextmanager
-def force(strat: Strategy):
+def force(strat: Strategy = default_strategy):
     mod = sys.modules[__name__]
     prev = getattr(mod, "_strategy_enabled", None)
     try:
         setattr(mod, "_strategy_enabled", strat)
         # Reset debug attempts for this session when entering a forced context
-        store = _session_debug_list()
-        if store is not None:
-            store.clear()
-        else:
-            _last_pdf_attempts.clear()
+        clear_pdf_debug()
         yield
     finally:
         setattr(mod, "_strategy_enabled", prev)

@@ -5,10 +5,7 @@ from PIL import Image
 from utils.cache import load_my_labels, load_my_model
 from utils.config import IMAGE_EXTENSIONS, MODEL_CONFIG
 from utils.grad_cam import generate_gradcam_overlay, make_gradcam_heatmap
-from utils.preprocessing import (
-    get_preprocess_fn,
-    preprocess_image,
-)
+from utils.preprocessing import get_preprocess_fn, preprocess_image
 
 st.title("Grad-CAM Explorer")
 st.write("See *why* a model is making its prediction.")
