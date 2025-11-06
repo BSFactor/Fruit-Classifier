@@ -16,7 +16,8 @@ __all__ = [
     "render_notebook_to_html",
     "render_notebook_to_pdf",
     "Strategy",
-    "force",
+    "default_strategy",
+    "apply_strategy",
     "get_pdf_debug",
     "clear_pdf_debug",
 ]
@@ -71,8 +72,9 @@ class Strategy(enum.IntFlag):
     QTPDF = enum.auto()
 
 
-_strategy_enabled: Strategy | None = None
+_strategy: Strategy | None = None
 default_strategy: Strategy = Strategy.TEX | Strategy.WEBPDF
+_logging_enabled: bool = False
 
 
 # giving up is real
@@ -83,16 +85,16 @@ def strategy_influenced[**P, R](
 
 
 def _forced():
-    return _strategy_enabled is not None
+    return _logging_enabled
 
 
 def _effective_strategy() -> Strategy:
-    return _strategy_enabled if _strategy_enabled is not None else default_strategy
+    return _strategy if _strategy is not None else default_strategy
 
 
 class MetaStrategyInfluenced(type):
     @property
-    def forced(cls) -> bool:
+    def logging(cls) -> bool:
         "class"
         return _forced()
 
@@ -191,16 +193,16 @@ class StrategyInfluenced[**P, R](metaclass=MetaStrategyInfluenced):
         # Use default strategy when not forced, but only log debug when forced
         if not (StrategyInfluenced.effective_strategy & self.strategy):
             return None
-        forced = StrategyInfluenced.forced
-        if forced:
+        logging = StrategyInfluenced.logging
+        if logging:
             self.debug_start()
         try:
             r = self.function(*a, **k)
         except Exception as e:  # pylint: disable=broad-except
-            if forced:
+            if logging:
                 self.debug_fail(e)
             return None
-        if forced:
+        if logging:
             self.debug_end(r)
         return r
 
@@ -331,15 +333,15 @@ def render_notebook_to_html(path: str, _mtime: float, theme: str = "light") -> s
 
 @st.cache_data(show_spinner=False)
 def render_notebook_to_pdf(
-    path: str,
-    _mtime: float,
+    path: str, mtime: float, strategy_cache_key: int | Strategy = default_strategy
 ) -> Optional[bytes]:  # pragma: no cover
-    """Stub for rendering a .ipynb to PDF.
+    """Render a .ipynb to PDF trying multiple exporters.
 
-    Note: Implementing PDF export portably can require additional nbconvert/TeX
-    dependencies (e.g., Pyppeteer/WeasyPrint/LaTeX). This returns a placeholder
-    empty PDF header for now to let the UI wire up a future exporter.
+    The ``strategy_cache_key`` is unused at runtime but participates in the
+    cache key so different strategy selections don't reuse old results.
     """
+    # NOP reference so linters recognize the cache key parameter is intentional
+    _ = strategy_cache_key, mtime
     with open(path, "r", encoding="utf-8") as f:
         nb = nbformat.read(f, as_version=4)
 
@@ -365,13 +367,19 @@ def render_notebook_to_pdf(
 
 
 @contextlib.contextmanager
-def force(strat: Strategy = default_strategy):
+def apply_strategy(strat: Strategy = default_strategy, logging: bool = False):
     mod = sys.modules[__name__]
-    prev = getattr(mod, "_strategy_enabled", None)
+    prev_strat = getattr(mod, "_strategy", None)
+    prev_logging = getattr(mod, "_logging_enabled", False)
+
     try:
-        setattr(mod, "_strategy_enabled", strat)
-        # Reset debug attempts for this session when entering a forced context
-        clear_pdf_debug()
+        setattr(mod, "_strategy", strat)
+        if logging:
+            setattr(mod, "_logging_enabled", True)
+            # Reset debug attempts for this session when entering a logging context
+            clear_pdf_debug()
         yield
     finally:
-        setattr(mod, "_strategy_enabled", prev)
+        setattr(mod, "_strategy", prev_strat)
+        if logging:
+            setattr(mod, "_logging_enabled", prev_logging)

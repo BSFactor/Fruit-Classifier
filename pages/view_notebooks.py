@@ -8,8 +8,8 @@ import streamlit.logger
 
 from utils.notebook_rendering import (
     Strategy,
-    clear_pdf_debug,
-    force,
+    apply_strategy,
+    default_strategy,
     get_pdf_debug,
     render_notebook_to_html,
     render_notebook_to_pdf,
@@ -74,23 +74,24 @@ if os.path.exists(notebook_path):
 
     @st.fragment
     def pdf_slot(key: str):
+        # Ensure store exists
+        if "pdf_store" not in st.session_state:
+            st.session_state.pdf_store = {}
         slot_state = st.session_state.pdf_store.get(key)
 
         def _render_now() -> None:
             # Read debug panel choices from session
-            strat_val: int = st.session_state.get(
-                "_pdf_strategy", int(Strategy.TEX | Strategy.WEBPDF)
-            )
+            strat_bits = st.session_state.get("_pdf_strategy", int(default_strategy))
+            try:
+                strat_val: Strategy = Strategy(strat_bits)
+            except (ValueError, TypeError):
+                strat_val = default_strategy
             do_force: bool = st.session_state.get("_pdf_force", False)
-            # Clear only the PDF function cache so strategy changes take effect
-
-            if do_force:
-                with force(Strategy(strat_val)):
+            with apply_strategy(strat_val, do_force):  # more like
+                if do_force:
                     render_notebook_to_pdf.clear()
-                    clear_pdf_debug()
-                    result = render_notebook_to_pdf(notebook_path, mtime)
-            else:
-                result = render_notebook_to_pdf(notebook_path, mtime)
+                # include strategy bits in cache key
+                result = render_notebook_to_pdf(notebook_path, mtime, int(strat_val))
 
             if result is None:
                 st.session_state.pdf_store[key] = {
@@ -112,18 +113,6 @@ if os.path.exists(notebook_path):
                 mime="application/pdf",
                 use_container_width=True,
             )
-
-            if st.session_state.get("_pdf_force", False):
-                st.button(
-                    "Re-render PDF with current options",
-                    on_click=_render_now,
-                    use_container_width=True,
-                )
-                # Show attempts if available
-                attempts = (slot_state or {}).get("debug") or []
-                if attempts:
-                    with st.expander("Show PDF debug attempts"):
-                        st.json(attempts)
         else:
             btn_label = (
                 "Render PDF (unavailable)"
@@ -133,7 +122,7 @@ if os.path.exists(notebook_path):
             st.button(btn_label, on_click=_render_now, use_container_width=True)
 
         # Debug/strategy panel
-        with st.expander("PDF debug options"):
+        with st.expander("PDF options"):
             _tex = st.checkbox("Enable TEX (LaTeX)", value=True, key="_tex")
             _web = st.checkbox("Enable WEBPDF (Chromium)", value=True, key="_web")
             _qt = st.checkbox("Enable QTPDF (Qt)", value=False, key="_qt")
@@ -142,12 +131,24 @@ if os.path.exists(notebook_path):
             )
             _strat_val = Strategy.NONE
             if _tex:
-                _strat_val |= int(Strategy.TEX)
+                _strat_val |= Strategy.TEX
             if _web:
-                _strat_val |= int(Strategy.WEBPDF)
+                _strat_val |= Strategy.WEBPDF
             if _qt:
-                _strat_val |= int(Strategy.QTPDF)
-            st.session_state["_pdf_strategy"] = _strat_val
+                _strat_val |= Strategy.QTPDF
+            # store as int to avoid serialization issues
+            st.session_state["_pdf_strategy"] = int(_strat_val)
+        if _force:
+            st.button(
+                "Re-render PDF with current options",
+                on_click=_render_now,
+                use_container_width=True,
+            )
+            # Show attempts if available
+            attempts = (slot_state or {}).get("debug") or []
+            if attempts:
+                with st.expander("Show PDF debug attempts"):
+                    st.json(attempts)
 
     with st.sidebar:
         st.download_button(
