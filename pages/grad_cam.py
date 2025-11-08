@@ -2,16 +2,10 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
-from utils import (
-    IMAGE_EXTENSIONS,
-    MODEL_CONFIG,
-    generate_gradcam_overlay,
-    get_preprocess_fn,
-    load_my_labels,
-    load_my_model,
-    make_gradcam_heatmap,
-    preprocess_image,
-)
+from utils.cache import load_my_labels, load_my_model
+from utils.config import IMAGE_EXTENSIONS, MODEL_CONFIG
+from utils.grad_cam import generate_gradcam_overlay, make_gradcam_heatmap
+from utils.preprocessing import get_preprocess_fn, preprocess_image
 
 st.title("Grad-CAM Explorer")
 st.write("See *why* a model is making its prediction.")
@@ -33,15 +27,15 @@ st.selectbox(
 selected_model_name = st.session_state["model_choice"]
 selected_model_cfg = MODEL_CONFIG[selected_model_name]
 
-# --- LOAD MODELS (from cache) ---
-model = load_my_model(model_path_in=selected_model_cfg["file"])
-labels = load_my_labels()
 
 # --- UPLOAD AND PREDICT ---
 uploaded_file = st.file_uploader("Choose an image...", type=IMAGE_EXTENSIONS)
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
+    # load models (from cache)
+    model = load_my_model(model_path_in=selected_model_cfg["file"])
+    labels = load_my_labels()
 
     # Preprocess the image
     processed_image_array = preprocess_image(

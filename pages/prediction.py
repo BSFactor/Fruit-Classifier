@@ -4,15 +4,10 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
-# Import all our helper functions from utils.py
-from utils import (
-    IMAGE_EXTENSIONS,
-    MODEL_CONFIG,
-    get_preprocess_fn,
-    load_my_labels,
-    load_my_model,
-    preprocess_image,
-)
+# Import all our helper functions
+from utils.cache import load_my_labels, load_my_model
+from utils.config import IMAGE_EXTENSIONS, MODEL_CONFIG
+from utils.preprocessing import get_preprocess_fn, preprocess_image
 
 # --- SET UP THE PAGE ---
 st.set_page_config(page_title="Fruit Classifier", layout="centered")
@@ -59,8 +54,6 @@ if not os.path.exists("labels.json"):
     st.error("Required file 'labels.json' not found in app directory.")
     st.stop()
 
-model = load_my_model(model_path_in=model_path)
-labels = load_my_labels()
 
 # --- 4. THE UPLOAD WIDGET ---
 uploaded_file = st.file_uploader(
@@ -69,6 +62,9 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
+    model = load_my_model(model_path_in=model_path)
+    labels = load_my_labels()
+
     # 1. Display the uploaded image
     image = Image.open(uploaded_file)
     # For animated images (GIF/TIFF), use the first frame
