@@ -1,0 +1,3 @@
+PyQt5
+streamlit[charts]
+nbconvert[webpdf]
